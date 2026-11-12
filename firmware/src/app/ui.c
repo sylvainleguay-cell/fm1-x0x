@@ -2107,6 +2107,22 @@ static int pad_len_of(const bpart_t *bp, int s)
     return k;
 }
 
+/* step s of the part shown, in its pattern: every lane's value there cleared (an emptied lane is freed) */
+static void pad_step_unlock(int s)
+{
+    int k, j, any;
+    for (k = 0; k < NLANE; k++) {
+        lane_t *l = &proj.arr.lane[k];
+        if (!l->used || l->part != ui.part || l->pat != seq.ppat[ui.part] || l->val[s] == MOT_NONE)
+            continue;
+        l->val[s] = MOT_NONE;
+        for (any = 0, j = 0; j < NSTEPS; j++)
+            any |= l->val[j] != MOT_NONE;
+        if (!any)
+            motion_clear(proj.arr.lane, k);
+    }
+}
+
 /* writes a length: the step a NOTE (0: a REST), the L - 1 after it TIEs on its note, and the TIEs that held it
  * further back to RESTs (to the pattern's end: no wrap) */
 static void pad_len_set(bpart_t *bp, int s, int l)
@@ -2117,8 +2133,10 @@ static void pad_len_set(bpart_t *bp, int s, int l)
     st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (l ? G_NOTE : G_REST));
     for (k = 1; k < l; k++) {
         bstep_t *t = &bp->step[s + k];
+        if (bstep_gate(t) != G_TIE)                    /* a step it now covers: its own values (p-locks, chance) go */
+            pad_step_unlock(s + k);
         t->note = st->note;
-        t->flags = (uint8_t)((t->flags & ~(BS_GATE_MASK | BS_ACCENT | BS_SLIDE)) | G_TIE);
+        t->flags = (uint8_t)((t->flags & ~(BS_GATE_MASK | BS_ACCENT | BS_SLIDE | BS_PAD_BITS)) | G_TIE);
     }
     for (k = s + (l ? l : 1); k < bp->len && bstep_gate(&bp->step[k]) == G_TIE; k++)
         bp->step[k].flags = (uint8_t)((bp->step[k].flags & ~BS_GATE_MASK) | G_REST);
@@ -4047,6 +4065,8 @@ static uint32_t knobs_sig(void)
     if (ui.held_step >= 0) {
         const bstep_t *st = &cur_pat()->bass[bidx()].step[ui.held_step];
         MIXIN(st->note | st->flags << 8);
+        if (is_pad())                                  /* its LENGTH: in the steps after it */
+            MIXIN(pad_len_of(&cur_pat()->bass[bidx()], ui.held_step));
     }
 #undef MIXIN
     return h;

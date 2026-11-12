@@ -35,6 +35,30 @@ turn K2 7
 key w0 up
 expect gate1.7 2
 expect gate1.8 0
+# a step the length comes to cover loses its own values (a p-lock on step 5: its lane goes with it), and the
+# LENGTH on the screen follows each detent (the knob row's signature has the length in it)
+key w0 down
+turn K2 -7
+key w0 up
+expect gate1.0 1
+expect gate1.1 0
+lane 2 1 0 4 99
+expect lanes 1
+key w0 down
+turn K2 3
+key w0 up
+expect lanes 1
+key w0 down
+turn K2 1
+wait 120
+shot padlen5.png
+key w0 up
+expect gate1.4 2
+expect lanes 0
+key w0 down
+turn K2 3
+key w0 up
+expect gate1.7 2
 # KNOB 3: the step's CHORD (PAD: the PAD's CHORD, NOTE, MIN7, MAJ7), KNOB 4: its inversion (flags bits 4-5, 6-7)
 key w0 down
 turn K3 1
