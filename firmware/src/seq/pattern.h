@@ -24,6 +24,10 @@ enum { G_REST, G_NOTE, G_TIE };                             /* 303 step gate */
 #define BS_GATE_MASK 0x03u
 #define BS_ACCENT 0x04u
 #define BS_SLIDE 0x08u                /* slide INTO the next step (303 semantics) */
+/* the PAD's steps (the fourth part, 303 B's place, in this build), in the bits the 303 leaves free: */
+#define BS_PAD_CHORD 0x30u            /* its chord: 0 the PAD's CHORD, 1 NOTE (no chord), 2 MIN7, 3 MAJ7 */
+#define BS_PAD_INV 0xC0u              /* its inversion: 0 none .. 3 (the lowest note an octave up, that many times) */
+#define BS_PAD_BITS (BS_PAD_CHORD | BS_PAD_INV)
 typedef struct {
     uint8_t note;                     /* MIDI note */
     uint8_t flags;                    /* gate | BS_ACCENT | BS_SLIDE */

@@ -976,6 +976,10 @@ static int expect(const char *what, const char *val)
         int k, v, s;
         sscanf(what, "hit%d.%d.%d", &k, &v, &s);
         got = sm_get(proj.pat[seq.ppat[k]].drum[k].hit[v], s);
+    } else if (!strncmp(what, "bflags", 6)) {      /* bflagsB.S: line B step S's flags (the PAD's chord, inv) */
+        int b, s;
+        sscanf(what, "bflags%d.%d", &b, &s);
+        got = proj.pat[seq.ppat[PART_303A + b]].bass[b].step[s].flags;
     } else if (!strncmp(what, "gate", 4)) {        /* gateB.S: 303 B step S gate */
         int b, s;
         sscanf(what, "gate%d.%d", &b, &s);

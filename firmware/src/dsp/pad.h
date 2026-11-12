@@ -61,6 +61,10 @@ typedef struct {
 
 void pad_init(pad_t *p);
 void pad_note_on(pad_t *p, int note, int accent, int slide);
+/* a sequencer step's: step bits 0-1 its chord (0 the CHORD pot's, 1 NOTE, 2 MIN7, 3 MAJ7), 2-3 its inversion */
+void pad_note_on_step(pad_t *p, int note, int accent, int slide, int step);
+int pad_chord_step(const pad_t *p, int note, int step, int out[4]);
+int pad_step_chord(int pot_chord, int step);                     /* the CHORD a step plays (PAD_MIN7 .. PAD_NOTE) */
 void pad_note_off(pad_t *p);
 void pad_all_off(pad_t *p);
 void pad_render(pad_t *p, float *out_l, float *out_r, int n);   /* writes (not adds) n samples a side */

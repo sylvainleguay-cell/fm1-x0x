@@ -8,6 +8,8 @@
 > With HOLD on (the default) a chord rings to the next note, so one note per bar writes a chord progression;
 > with HOLD off a chord lasts as long as its **LENGTH**: in SEQ, hold a PAD step and turn KNOB 2 (LENGTH: REST,
 > 1-16 steps; it writes the TIE steps for you, and turns HOLD off).
+> A held PAD step's KNOB 3 is its own **CHORD** (PAD: the CHORD page's; NOTE: the note alone; MIN7; MAJ7) and
+> KNOB 4 its **INV**ersion (ROOT, 1ST, 2ND, 3RD); the CH and IN rows under the line show the steps that have them.
 >
 > On the FM-1: ALGORITHM to **PAD** (the fourth part), SEQ to write its steps (KNOB 1 a held step's note; the
 > screen names the chord), EDIT for its pages TONE (cutoff, resonance, env, chorus), CHORD (chord, key,

@@ -35,7 +35,7 @@ static pad_t pad POOL;
 static void bn_on(int p, int note, int acc, int sl)
 {
     if (p)
-        pad_note_on(&pad, note, acc, sl);
+        pad_note_on_step(&pad, note, acc & 1, sl, (acc & BS_PAD_BITS) >> 4);   /* the step's chord, inversion */
     else
         bass303_note_on(&b303[0], note, acc, sl);
 }
@@ -359,7 +359,8 @@ void engine_drum(int kit, int voice, float vel)
 }
 void engine_bass_on(int part, int note, int accent, int slide)
 {
-    cq_put(C_BON, (uint32_t)part, (uint32_t)note, (uint32_t)((accent ? 1 : 0) | (slide ? 2 : 0)));
+    cq_put(C_BON, (uint32_t)part, (uint32_t)note,
+           (uint32_t)((accent & 1) | (slide ? 2 : 0) | (accent & BS_PAD_BITS)));   /* (the PAD's step bits) */
 }
 void engine_bass_off(int part) { cq_put(C_BOFF, (uint32_t)part, 0, 0); }
 void engine_brk_live(int key, int down) { cq_put(C_BRK, (uint32_t)key, (uint32_t)(down != 0), 0); }
@@ -799,7 +800,7 @@ static void drain(void)
         else if (type == C_DRUM)
             s_drum(0, (int)a, (int)b, (float)v / 4095.0f);
         else if (type == C_BON && a < NBASS)
-            bn_on((int)a, (int)b, (int)(v & 1u), (int)((v >> 1) & 1u));
+            bn_on((int)a, (int)b, (int)(v & (1u | BS_PAD_BITS)), (int)((v >> 1) & 1u));
         else if (type == C_BOFF && a < NBASS)
             bn_off((int)a);
         else if (type == C_BRK && !brk_hold && X0X_BREAK)

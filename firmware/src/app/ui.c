@@ -2061,7 +2061,8 @@ static void bass_step_key(int white, int down)
         }
         ui.step_preview = key_sounds();               /* as the drum keys */
         if (ui.step_preview)
-            engine_bass_on(b, bp->step[s].note + bp->transpose - 24, (bp->step[s].flags & BS_ACCENT) != 0, 0);
+            engine_bass_on(b, bp->step[s].note + bp->transpose - 24,
+                           ((bp->step[s].flags & BS_ACCENT) != 0) | (b ? bp->step[s].flags & BS_PAD_BITS : 0), 0);
     } else if (ui.held_step == s) {
         if (!ui.step_created && !ui.step_edited && key_tap_ms < STEP_TAP_MS) {   /* a tap takes it off */
             bp->step[s].flags = G_REST;
@@ -2134,7 +2135,7 @@ static void held_note_by(int by)
     ui.step_edited = 1;
     mark_dirty();
     if (key_sounds()) {                                /* as the drum keys: playing, the line is heard */
-        engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
+        engine_bass_on(bidx(), st->note + bp->transpose - 24, is_pad() ? st->flags & BS_PAD_BITS : 0, 1);
         ui.step_preview = 1;
     }
 }
@@ -2659,6 +2660,13 @@ static void input(void)
                 }
             } else if (i == 1) {
                 st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (bstep_gate(st) + (e > 0 ? 1 : 2)) % 3);
+            } else if (is_pad()) {                     /* the PAD: 3 its CHORD (the PAD's, NOTE, MIN7, MAJ7), 4 its INV */
+                uint8_t m = i == 2 ? BS_PAD_CHORD : BS_PAD_INV, sh = i == 2 ? 4 : 6;
+                int v = ((st->flags & m) >> sh) + (e > 0 ? 1 : -1);
+                v = v < 0 ? 0 : v > 3 ? 3 : v;
+                st->flags = (uint8_t)((st->flags & ~m) | (v << sh));
+                if (key_sounds())                      /* heard as it is set */
+                    engine_bass_on(bidx(), held_note_of(bp, ui.held_step) + bp->transpose - 24, st->flags & BS_PAD_BITS, 0);
             } else if (i == 2) {
                 st->flags ^= BS_ACCENT;
             } else {
@@ -3231,11 +3239,16 @@ static void draw_303(int band, int gen)
                 cv_line(x + 11, y + 2, x + 14, ny + 2, C_WHITE);
             }
         }
+        if (is_pad()) {                                /* the PAD: a chord of its own, an inversion */
+            rbox(x + 1, 101 - o, 10, 4, 2, g && (st->flags & BS_PAD_CHORD) ? C_WHITE : C_LINE);
+            rbox(x + 1, 113 - o, 10, 4, 2, g && (st->flags & BS_PAD_INV) ? col : C_LINE);
+            continue;
+        }
         rbox(x + 1, 101 - o, 10, 4, 2, g && (st->flags & BS_ACCENT) ? C_WHITE : C_LINE);   /* its accent, its slide */
         rbox(x + 1, 113 - o, 10, 4, 2, g && (st->flags & BS_SLIDE) ? col : C_LINE);
     }
-    cv_text(3, vc(&FONT_XS, 99, 8) - o, &FONT_XS, "AC", C_GRAY);
-    cv_text(3, vc(&FONT_XS, 111, 8) - o, &FONT_XS, "SL", C_GRAY);
+    cv_text(3, vc(&FONT_XS, 99, 8) - o, &FONT_XS, is_pad() ? "CH" : "AC", C_GRAY);
+    cv_text(3, vc(&FONT_XS, 111, 8) - o, &FONT_XS, is_pad() ? "IN" : "SL", C_GRAY);
     if (ui.held_step >= 0 || ui.rec) {   /* the step held (or being written) */
         int s = ui.held_step >= 0 ? ui.held_step : ui.wpos[b];
         const bstep_t *st = &bp->step[s];
@@ -3245,7 +3258,8 @@ static void draw_303(int band, int gen)
         q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
         if (is_pad()) {                                /* the chord it plays: "STEP 9  E3 Em7" (NOTE: none) */
             int nn = held_note_of(bp, s) + bp->transpose - 24;
-            int pq = pad_quality(proj.sound.v[T_303][1][PAD_CHORD], proj.sound.v[T_303][1][PAD_KEY], nn);
+            int pq = pad_quality(pad_step_chord(proj.sound.v[T_303][1][PAD_CHORD], (st->flags & BS_PAD_BITS) >> 4),
+                                 proj.sound.v[T_303][1][PAD_KEY], nn);
             if (pq >= 0) {
                 q = put_s(q, " ");
                 q = put_s(q, NOTE_N[(nn % 12 + 12) % 12]);
@@ -4126,10 +4140,17 @@ static void draw_knobs(void)
                     put_s(v, "REST");
             } else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
-            else
+            else if (is_pad() && i == 2) {
+                static const char *const PC[4] = {"PAD", "NOTE", "MIN7", "MAJ7"};
+                put_s(v, PC[(st->flags & BS_PAD_CHORD) >> 4]);
+            } else if (is_pad()) {
+                static const char *const PI[4] = {"ROOT", "1ST", "2ND", "3RD"};
+                put_s(v, PI[(st->flags & BS_PAD_INV) >> 6]);
+            } else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
             text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS,
-                   i == 1 && is_pad() && bstep_gate(st) != G_TIE ? "LENGTH" : SN[i], C_GRAY);
+                   !is_pad() ? SN[i] : i == 1 && bstep_gate(st) != G_TIE ? "LENGTH" : i == 2 ? "CHORD" : i == 3 ? "INV" : SN[i],
+                   C_GRAY);
             text_c(cx, vc(&FONT_M, 30, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);

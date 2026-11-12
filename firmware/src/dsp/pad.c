@@ -50,9 +50,17 @@ int pad_quality(int chord, int key, int note)
     return q < 0 ? PAD_Q_MAJ7 : q;
 }
 
-int pad_chord(const pad_t *p, int note, int out[4])
+int pad_step_chord(int pot_chord, int step)
 {
-    int k, q = pad_quality(p->pot[PAD_CHORD], p->pot[PAD_KEY], note);
+    static const uint8_t OV[4] = {0, PAD_NOTE, PAD_MIN7, PAD_MAJ7};
+    return (step & 3) ? OV[step & 3] : pot_chord;
+}
+
+int pad_chord(const pad_t *p, int note, int out[4]) { return pad_chord_step(p, note, 0, out); }
+
+int pad_chord_step(const pad_t *p, int note, int step, int out[4])
+{
+    int k, q = pad_quality(pad_step_chord(p->pot[PAD_CHORD], step), p->pot[PAD_KEY], note), inv = (step >> 2) & 3;
     const int8_t *iv;
     if (q < 0) {                                 /* NOTE: the note alone */
         out[0] = note < 12 ? 12 : note > 115 ? 115 : note;
@@ -66,6 +74,12 @@ int pad_chord(const pad_t *p, int note, int out[4])
         for (k = 0; k < 4; k++)
             out[k] = note + iv[k];
         break;
+    }
+    while (inv--) {                              /* an inversion: the lowest note an octave up */
+        int lo = 0;
+        for (k = 1; k < 4; k++)
+            lo = out[k] < out[lo] ? k : lo;
+        out[lo] += 12;
     }
     for (k = 0; k < 4; k++)
         out[k] = out[k] < 12 ? 12 : out[k] > 115 ? 115 : out[k];
@@ -125,11 +139,13 @@ void pad_init(pad_t *p)
     p->idle = 1;
 }
 
-void pad_note_on(pad_t *p, int note, int accent, int slide)
+void pad_note_on(pad_t *p, int note, int accent, int slide) { pad_note_on_step(p, note, accent, slide, 0); }
+
+void pad_note_on_step(pad_t *p, int note, int accent, int slide, int step)
 {
     int c[4], k, b, n;
     float vel = accent ? 1.0f : 0.72f;
-    n = pad_chord(p, note, c);
+    n = pad_chord_step(p, note, step, c);
     if (n == 1)
         vel *= 1.8f;                             /* one voice: as loud as a chord of four */
     if (slide && p->held) {                     /* legato: the same voices glide to the new chord */

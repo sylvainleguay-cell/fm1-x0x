@@ -78,6 +78,20 @@ int main(void)
     run(4, 0);
     pk = run(20, &corr);
     CHECK(corr > 0.999f, "chorus off: mono (correlation %f)", (double)corr);
+    /* a step's own chord and inversion (pad_chord_step): NOTE, MIN7, MAJ7 over the CHORD pot; inversions */
+    pad_init(&p);
+    pad_set(&p, PAD_VOICING, PAD_CLOSE);
+    pad_set(&p, PAD_CHORD, PAD_MAJ7);
+    CHECK(pad_chord_step(&p, 57, 1, c) == 1 && c[0] == 57, "step NOTE over MAJ7");
+    pad_chord_step(&p, 57, 2, c);
+    CHECK(c[1] == 60, "step MIN7 over MAJ7: %d", c[1]);
+    pad_chord_step(&p, 57, 0, c);
+    CHECK(c[1] == 61, "step 0: the pot's MAJ7: %d", c[1]);
+    pad_chord_step(&p, 57, 2 | (1 << 2), c);      /* Am7, first inversion: C E G A+12 */
+    CHECK(c[0] == 69 && c[1] == 60 && c[2] == 64 && c[3] == 67, "Am7 1st inversion: %d %d %d %d", c[0], c[1], c[2], c[3]);
+    pad_chord_step(&p, 57, 2 | (3 << 2), c);      /* third: G A+12 C+12 E+12 */
+    CHECK(c[0] == 69 && c[1] == 72 && c[2] == 76 && c[3] == 67, "Am7 3rd inversion: %d %d %d %d", c[0], c[1], c[2], c[3]);
+    CHECK(pad_step_chord(PAD_AUTO, 0) == PAD_AUTO && pad_step_chord(PAD_AUTO, 1) == PAD_NOTE, "pad_step_chord");
     /* NOTE: one voice sounds; a chord sliding to a NOTE keeps one */
     pad_init(&p);
     pad_set(&p, PAD_CHORD, PAD_NOTE);
