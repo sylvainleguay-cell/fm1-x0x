@@ -23,7 +23,7 @@
 
 #define PAD_SR 44100.0f
 #define PAD_NV 8                                 /* two banks of four */
-#define PAD_DLY 512                              /* the chorus line: 11.6 ms */
+#define PAD_DLY 256                              /* the chorus line: 5.8 ms (its taps reach 5.35), 16-bit */
 
 enum {
     PAD_CUTOFF, PAD_RESO, PAD_ENVMOD, PAD_CHORUS,      /* page 1: TONE */
@@ -50,7 +50,7 @@ typedef struct {
     int bank;                                    /* the bank the chord sounding is on (0 / 1) */
     int held;                                    /* a chord is held */
     float lfo, cho;                              /* PWM LFO and chorus LFO phases (0..1) */
-    float dly[PAD_DLY];
+    int16_t dly[PAD_DLY];                        /* x 8192 (the voices peak well inside +-4) */
     int w;
     /* derived (pad_set) */
     float cut_oct, reso_k, envmod, att, dec, sus, rel, pwm, sub, hpk, vol, cho_rate, cho_min, cho_span;

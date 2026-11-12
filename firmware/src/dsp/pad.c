@@ -177,6 +177,12 @@ void pad_all_off(pad_t *p)
     p->held = 0;
 }
 
+static inline int16_t pad_q(float x)            /* a sample into the chorus line */
+{
+    x *= 8192.0f;
+    return (int16_t)(x > 32767.0f ? 32767.0f : x < -32768.0f ? -32768.0f : x);
+}
+
 static inline float blep(float t, float dt)     /* polyBLEP residual */
 {
     if (t < dt) {
@@ -311,7 +317,7 @@ void pad_render(pad_t *p, float *out_l, float *out_r, int n)
         out_l[i] *= p->vol;
     if (p->cho_rate == 0.0f) {                   /* no chorus: the same on both sides */
         for (i = 0; i < n; i++) {
-            p->dly[p->w] = out_l[i];
+            p->dly[p->w] = pad_q(out_l[i]);
             p->w = (p->w + 1) & (PAD_DLY - 1);
             out_r[i] = out_l[i];
         }
@@ -321,18 +327,18 @@ void pad_render(pad_t *p, float *out_l, float *out_r, int n)
         for (i = 0; i < n; i++) {
             float x = out_l[i], tri = ph < 0.5f ? 2.0f * ph : 2.0f - 2.0f * ph, d, f, a, b;
             int r;
-            p->dly[w] = x;
+            p->dly[w] = pad_q(x);
             d = lo + span * tri;                 /* left tap */
             r = (int)d;
             f = d - (float)r;
-            a = p->dly[(w - r) & (PAD_DLY - 1)];
-            b = p->dly[(w - r - 1) & (PAD_DLY - 1)];
+            a = (float)p->dly[(w - r) & (PAD_DLY - 1)] * (1.0f / 8192.0f);
+            b = (float)p->dly[(w - r - 1) & (PAD_DLY - 1)] * (1.0f / 8192.0f);
             out_l[i] = 0.7f * (x + a + (b - a) * f);
             d = lo + span * (1.0f - tri);        /* right tap: the opposite phase */
             r = (int)d;
             f = d - (float)r;
-            a = p->dly[(w - r) & (PAD_DLY - 1)];
-            b = p->dly[(w - r - 1) & (PAD_DLY - 1)];
+            a = (float)p->dly[(w - r) & (PAD_DLY - 1)] * (1.0f / 8192.0f);
+            b = (float)p->dly[(w - r - 1) & (PAD_DLY - 1)] * (1.0f / 8192.0f);
             out_r[i] = 0.7f * (x + a + (b - a) * f);
             w = (w + 1) & (PAD_DLY - 1);
             ph += rate;
@@ -347,6 +353,6 @@ void pad_render(pad_t *p, float *out_l, float *out_r, int n)
     else if ((p->quiet += n) > PAD_DLY + 256) {  /* the chorus line has emptied: idle */
         p->idle = 1;
         for (i = 0; i < PAD_DLY; i++)
-            p->dly[i] = 0.0f;
+            p->dly[i] = 0;
     }
 }
