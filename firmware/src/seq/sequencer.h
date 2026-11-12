@@ -156,6 +156,8 @@ typedef struct {
     uint8_t bass_notes_out[NBASS];    /* note echoed on MIDI, for the note off */
     volatile uint8_t hold_mask;       /* bit b: note part b holds its note through rests, to the next note (the
                                        * PAD's HOLD); its mute, a stop or a pattern change still release it */
+    volatile uint8_t full_mask;       /* bit b: note part b's gate lasts its whole step (15/16), not half: the
+                                       * PAD's, so a LENGTH of N steps sounds N steps */
 } seq_t;
 
 void seq_init(seq_t *s, pattern_t *patterns);

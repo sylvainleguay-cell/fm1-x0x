@@ -212,6 +212,7 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
             pad_set(&pad, i, val);
             if (i == PAD_HOLD)
                 seq.hold_mask = (uint8_t)(val ? 2u : 0u);
+            seq.full_mask = 2u;                           /* the PAD's gates: whole steps */
         } else if (v == 0)
             bass303_set(&b303[0], i, val);
         break;

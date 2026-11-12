@@ -6,7 +6,8 @@
 > four-note chord, **MIN7**, **MAJ7** or **AUTO** (the diatonic seventh chord of the note in the key you set:
 > Imaj7 ii7 iii7 IVmaj7 V7 vi7 viim7b5), voiced CLOSE, OPEN or WIDE, or **NOTE** (no chord: the note alone).
 > With HOLD on (the default) a chord rings to the next note, so one note per bar writes a chord progression;
-> with HOLD off a chord lasts half a step, longer with TIE steps after it.
+> with HOLD off a chord lasts as long as its **LENGTH**: in SEQ, hold a PAD step and turn KNOB 2 (LENGTH: REST,
+> 1-16 steps; it writes the TIE steps for you, and turns HOLD off).
 >
 > On the FM-1: ALGORITHM to **PAD** (the fourth part), SEQ to write its steps (KNOB 1 a held step's note; the
 > screen names the chord), EDIT for its pages TONE (cutoff, resonance, env, chorus), CHORD (chord, key,
@@ -16,8 +17,7 @@
 > comes back (the PAD stays in 303 B's place). Projects keep the same format: patterns made with X0X load, their
 > 303 B lines then playing as chords. Code: `firmware/src/dsp/pad.c`; tests: `tests/host/pad_test.c`,
 > `tests/scenarios/pad.x0x`.
->
-> **Planned:** a LENGTH per PAD step (hold the step, a knob: 1-16 steps), instead of writing TIE steps.
+
 
 X0X turns the M-VAVE FM-1 into a groovebox: a **909**, an **808**, two **303s** with an acid line
 generator, and a **breakbeat player**, all playing at once. Each part can play its own pattern,

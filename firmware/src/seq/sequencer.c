@@ -213,7 +213,8 @@ static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, 
     nx = next_pos(s, TRK_BASS0 + b, p, 0);
     hold = (st->flags & BS_SLIDE) || bstep_gate(&bp->step[nx]) == G_TIE;
     tr->held_note = (uint8_t)((note & 0x7F) | ((st->flags & BS_SLIDE) ? 0x80 : 0));
-    tr->to_off = hold || (s->hold_mask >> b & 1u) ? 0 : carry + step_q8 / 2u;
+    tr->to_off = hold || (s->hold_mask >> b & 1u) ? 0
+               : carry + ((s->full_mask >> b & 1u) ? step_q8 - step_q8 / 16u : step_q8 / 2u);
 }
 
 int seq_part_muted(const seq_t *s, int p)

@@ -1,0 +1,46 @@
+# The PAD's LENGTH (SEQ, a step held, KNOB 2): a NOTE and TIEs after it; 0 a REST; shorter: its TIEs back to
+# RESTs; the first length turns HOLD off (lengths play with it off); a chord sounds its length, whole steps.
+# (Holding an empty step writes a NOTE: a length of 1; each detent then adds or takes one.)
+wait 300
+turn ALGO 3
+expect part 3
+expect sound2.1.7 1
+tap SEQ
+key w0 down
+turn K2 3
+key w0 up
+expect gate1.0 1
+expect gate1.1 2
+expect gate1.2 2
+expect gate1.3 2
+expect gate1.4 0
+expect sound2.1.7 0
+shot padlen.png
+# shorter: 4 -> 2, steps 3 and 4 back to RESTs
+key w0 down
+turn K2 -2
+key w0 up
+expect gate1.1 2
+expect gate1.2 0
+expect gate1.3 0
+# 0: the step a REST, its TIE too
+key w0 down
+turn K2 -2
+key w0 up
+expect gate1.0 0
+expect gate1.1 0
+# a length of 8 on step 1 sounds ~8 steps (a step: 120 ms at 125 BPM) then lets go
+key w0 down
+turn K2 7
+key w0 up
+expect gate1.7 2
+expect gate1.8 0
+param 2 1 15 0
+param 5 3 1 0
+param 5 3 2 0
+wav padlen.wav
+tap PLAY
+wait 1800
+tap PLAY
+wait 300
+wavstop

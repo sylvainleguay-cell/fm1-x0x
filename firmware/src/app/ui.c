@@ -2094,6 +2094,35 @@ static int perf_testing(void) { return perf.test >= 0 && perf.phase != 4; }
 
 /* the held 303 step's note, moved by `by` semitones (KNOB 1: one; OCT: twelve); a rest or a tie
  * becomes a note of its own */
+/* the PAD's LENGTH: a NOTE step and the TIE steps after it, as one held chord (0: a REST) */
+#define PAD_MAXLEN 16
+static int pad_len_of(const bpart_t *bp, int s)
+{
+    int k = 1;
+    if (bstep_gate(&bp->step[s]) == G_REST)
+        return 0;
+    while (k < PAD_MAXLEN && s + k < bp->len && bstep_gate(&bp->step[s + k]) == G_TIE)
+        k++;
+    return k;
+}
+
+/* writes a length: the step a NOTE (0: a REST), the L - 1 after it TIEs on its note, and the TIEs that held it
+ * further back to RESTs (to the pattern's end: no wrap) */
+static void pad_len_set(bpart_t *bp, int s, int l)
+{
+    int k, max = bp->len - s;
+    bstep_t *st = &bp->step[s];
+    l = l < 0 ? 0 : l > PAD_MAXLEN ? PAD_MAXLEN : l > max ? max : l;
+    st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (l ? G_NOTE : G_REST));
+    for (k = 1; k < l; k++) {
+        bstep_t *t = &bp->step[s + k];
+        t->note = st->note;
+        t->flags = (uint8_t)((t->flags & ~(BS_GATE_MASK | BS_ACCENT | BS_SLIDE)) | G_TIE);
+    }
+    for (k = s + (l ? l : 1); k < bp->len && bstep_gate(&bp->step[k]) == G_TIE; k++)
+        bp->step[k].flags = (uint8_t)((bp->step[k].flags & ~BS_GATE_MASK) | G_REST);
+}
+
 static void held_note_by(int by)
 {
     bpart_t *bp = &cur_pat()->bass[bidx()];
@@ -2622,6 +2651,12 @@ static void input(void)
             mark_dirty();
             if (i == 0) {
                 held_note_by(e);
+            } else if (i == 1 && is_pad() && bstep_gate(st) != G_TIE) {   /* the PAD: LENGTH (REST, 1..16 steps) */
+                pad_len_set(bp, ui.held_step, pad_len_of(bp, ui.held_step) + (e > 0 ? 1 : -1));
+                if (pad_len_of(bp, ui.held_step) && proj.sound.v[T_303][1][PAD_HOLD]) {
+                    pref_set(PR(R_ENG, T_303, 1, PAD_HOLD), 0);       /* lengths play with HOLD off */
+                    say("HOLD OFF: LENGTHS PLAY", 0);
+                }
             } else if (i == 1) {
                 st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (bstep_gate(st) + (e > 0 ? 1 : 2)) % 3);
             } else if (i == 2) {
@@ -4083,11 +4118,18 @@ static void draw_knobs(void)
                 cv_rect(i * 60, 14, 1, 50, C_LINE);
             if (i == 0)
                 put_note(v, held_note_of(bp, ui.held_step) + bp->transpose - 24);
-            else if (i == 1)
+            else if (i == 1 && is_pad() && bstep_gate(st) != G_TIE) {
+                int l = pad_len_of(bp, ui.held_step);
+                if (l)
+                    put_i(v, l);
+                else
+                    put_s(v, "REST");
+            } else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
             else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
-            text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, SN[i], C_GRAY);
+            text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS,
+                   i == 1 && is_pad() && bstep_gate(st) != G_TIE ? "LENGTH" : SN[i], C_GRAY);
             text_c(cx, vc(&FONT_M, 30, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);
