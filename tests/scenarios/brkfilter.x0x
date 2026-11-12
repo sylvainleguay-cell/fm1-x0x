@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # the break's FILTER (#14): EDIT's second page (SOUND); 60..68 off, under it a low-pass, over it a high-pass
 wait 300
 turn ALGO 4

@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # Uploaded loops: tools/upload_breaks.py's slot image (synthetic test loops, built by
 # tests/run_tests.sh into build/test_upload/) parsed by the firmware's own slots.c.
 wait 200

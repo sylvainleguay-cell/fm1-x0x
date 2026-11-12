@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # BREAK: a step held + black key 1-8 gives that 16th its own slice of loop A, which plays there in
 # place of the generator's choice; the same key again gives it back to the generator.
 wait 300

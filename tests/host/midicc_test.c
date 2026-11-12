@@ -87,7 +87,7 @@ int main(void)
                     break;
             }
         }
-    CHECK(mapped == 125, "%d CCs mapped (125: 909 37, 808 38, two 303s 32, the break 7, the mix 11)", mapped);
+    CHECK(mapped == 129, "%d CCs mapped (129: 909 37, 808 38, the 303 16, the PAD 20, the break 7, the mix 11)", mapped);
     /* a part's level also goes out on MIX MIDI CH's 102-106 */
     nsent = 0;
     engine_cc_send(T_MIX, PART_303B, MX_LEVEL, 100);

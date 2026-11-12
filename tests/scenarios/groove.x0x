@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # Build a groove from the panel, as a player would, and record it.
 wait 500
 expect part 0

@@ -27,7 +27,7 @@ void pattern_init(pattern_t *p, uint32_t seed_a, uint32_t seed_b)
         bp->transpose = 24;
         tb3po_defaults(&bp->gen, b ? seed_b : seed_a);
         if (b)
-            bp->gen.base_oct = 2;     /* 303 B sits an octave above A by default */
+            bp->gen.base_oct = 3;     /* the PAD (303 B's place): its chords on A3 by default */
         for (i = 0; i < NSTEPS; i++) {
             bp->step[i].note = (uint8_t)(12 * (bp->gen.base_oct + 1) + bp->gen.root);
             bp->step[i].flags = G_REST;

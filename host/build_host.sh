@@ -11,7 +11,7 @@ mkdir -p build/gen build/host
 python3 tools/gen_words.py firmware/words.tsv web/words build/gen/ann_words.h >/dev/null
 if [ -n "${X0X_BREAK_BANK:-}" ]; then python3 tools/gen_break_bank.py "$X0X_BREAK_BANK" build/gen/x0x_break_bank.h >/dev/null
 else sh tools/gen_builtin_break.sh build/gen >/dev/null; fi
-U="firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass303.c firmware/src/dsp/breaks.c
+U="firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass303.c firmware/src/dsp/pad.c firmware/src/dsp/breaks.c
    firmware/src/dsp/fxbus.c firmware/src/dsp/master.c firmware/src/seq/sequencer.c firmware/src/seq/tb3po.c
    firmware/src/seq/pattern.c firmware/src/seq/motion.c firmware/src/app/engine.c"
 # shellcheck disable=SC2086

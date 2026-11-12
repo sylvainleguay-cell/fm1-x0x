@@ -189,6 +189,8 @@ static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, 
     uint8_t prev_slide = tr->held_note & 0x80u;     /* bit 7: the step that sounded slides on */
     if (s->mute & (1u << (MUTE_BASS0 + b)))
         gate = G_REST;
+    if (gate == G_REST && (s->hold_mask >> b & 1u) && !(s->mute & (1u << (MUTE_BASS0 + b))))
+        return;                                      /* HOLD: the chord rings on to the next note */
     if (gate == G_REST) {
         bass_release(s, b, o);
         tr->held_note = 0;
@@ -211,7 +213,7 @@ static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, 
     nx = next_pos(s, TRK_BASS0 + b, p, 0);
     hold = (st->flags & BS_SLIDE) || bstep_gate(&bp->step[nx]) == G_TIE;
     tr->held_note = (uint8_t)((note & 0x7F) | ((st->flags & BS_SLIDE) ? 0x80 : 0));
-    tr->to_off = hold ? 0 : carry + step_q8 / 2u;
+    tr->to_off = hold || (s->hold_mask >> b & 1u) ? 0 : carry + step_q8 / 2u;
 }
 
 int seq_part_muted(const seq_t *s, int p)

@@ -14,6 +14,7 @@
 #include "../dsp/fastmath.h"
 #include "../dsp/master.h"
 #include "../dsp/bass303.h"                    /* BASS303_* (the 303's pages) */
+#include "../dsp/pad.h"                        /* PAD_* (the PAD's pages) */
 #include "undo.c"
 
 /* ================================================================ model === */
@@ -25,8 +26,8 @@ enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, V_PERF, V_SEQ, NVIEWS 
 static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG", "PERF", "SEQ"};
 static const uint16_t PART_COL[NPARTS] = {RGB(255, 150, 40), RGB(255, 72, 64), RGB(130, 240, 90), RGB(70, 205, 255),
                                           RGB(214, 120, 255)};
-static const char *const PART_N[NPARTS] = {"909", "808", "303A", "303B", "BREAK"};
-static const char *const PART_S[NPARTS] = {"909", "808", "303A", "303B", "BRK"};   /* 4 chars: lane labels */
+static const char *const PART_N[NPARTS] = {"909", "808", "303", "PAD", "BREAK"};
+static const char *const PART_S[NPARTS] = {"909", "808", "303", "PAD", "BRK"};   /* 4 chars: lane labels */
 
 /* overlays drawn over the main area */
 enum { O_NONE, O_LIST, O_ASK };
@@ -122,6 +123,7 @@ static int steps_view(void) { return ui.view == V_PART || ui.view == V_SEQ; }   
 static song_t *song(void) { return &proj.arr.song; }
 static int is_303(void) { return ui.part == PART_303A || ui.part == PART_303B; }
 static int is_drum(void) { return ui.part == PART_909 || ui.part == PART_808; }
+static int is_pad(void) { return ui.part == PART_PAD; }    /* a note part, its notes chords (dsp/pad.h) */
 static int bidx(void) { return ui.part == PART_303B ? 1 : 0; }
 static int kbd_on(void) { return is_303() && (ui.rec || ui.freeplay[bidx()]); }   /* the keys a keyboard */
 static uint8_t kbd_held_note[NBASS];
@@ -223,7 +225,7 @@ static const x0x_param_t ACT_P[] = {
 };
 static const x0x_param_t STALLS_P = {"STALLS", 1, 0, ONOFF_N};
 static const x0x_param_t MIDICH_P[NPARTS] = {   /* 0 = OFF (no notes in or out), 1-16 */
-    {"909 MIDI CH", 16, 10, 0}, {"808 MIDI CH", 16, 11, 0}, {"303A MIDI CH", 16, 2, 0}, {"303B MIDI CH", 16, 3, 0},
+    {"909 MIDI CH", 16, 10, 0}, {"808 MIDI CH", 16, 11, 0}, {"303 MIDI CH", 16, 2, 0}, {"PAD MIDI CH", 16, 3, 0},
     {"BREAK MIDI CH", 16, 4, 0}};
 static const char *const OUT_N[] = {"NORMAL", "LOUD"};
 static const x0x_param_t OUT_P = {"OUTPUT", 1, 0, OUT_N};
@@ -239,7 +241,7 @@ static const x0x_param_t SREP_P = {"REPEAT", 7, 0, 0};    /* the bar plays 1-8 t
 static const char *const BATT_N[] = {"EMPTY", "1/3", "2/3", "FULL", "USB POWER", "..."};
 static const x0x_param_t BATT_P = {"BATTERY", 5, 0, BATT_N};   /* read only (plat_battery) */
 static const x0x_param_t SONG_P[] = {
-    {"909", NPAT - 1, 0, 0}, {"808", NPAT - 1, 0, 0}, {"303A", NPAT - 1, 0, 0}, {"303B", NPAT - 1, 0, 0},
+    {"909", NPAT - 1, 0, 0}, {"808", NPAT - 1, 0, 0}, {"303", NPAT - 1, 0, 0}, {"PAD", NPAT - 1, 0, 0},
     {"BREAK", NPAT - 1, 0, 0},
     {"LENGTH", NSONG, 0, 0},
 };
@@ -516,11 +518,11 @@ static const char *pref_name(pref_t r)
 {
     static const char *const MIXN[NPARTS][MX_NPARAMS] = {{"909", "909 RV", "909 DL", "909 PAN"},
                                                          {"808", "808 RV", "808 DL", "808 PAN"},
-                                                         {"303 A", "A REV", "A DLY", "A PAN"},
-                                                         {"303 B", "B REV", "B DLY", "B PAN"},
+                                                         {"303", "303 RV", "303 DL", "303 PAN"},
+                                                         {"PAD", "PAD RV", "PAD DL", "PAD PAN"},
                                                          {"BREAK", "BRK RV", "BRK DL", "BRK PAN"}};
-    static const char *const PATN[6][2] = {{"909 LEN", "808 LEN"}, {"909 RATE", "808 RATE"}, {"A LEN", "B LEN"},
-                                           {"A RATE", "B RATE"}, {"A DIR", "B DIR"}, {"A TRANSP", "B TRANSP"}};
+    static const char *const PATN[6][2] = {{"909 LEN", "808 LEN"}, {"909 RATE", "808 RATE"}, {"303 LEN", "PAD LEN"},
+                                           {"303 RATE", "PAD RATE"}, {"303 DIR", "PAD DIR"}, {"303 TRSP", "PAD TRSP"}};
     static const char *const CHN[MX_NPARAMS] = {"LEVEL", "REV", "DLY", "PAN"};
     const x0x_param_t *d = pref_desc(r);
     static const char *const SEQN[6] = {"LENGTH", "RATE", "LENGTH", "RATE", "DIRECTION", "TRANSP"};
@@ -832,6 +834,18 @@ static void build_pages(void)
                 add_page("KIT", PR(R_ENG, T_909, NDRUM, 1), NONE, NONE, NONE);
             else
                 add_page("KIT", PR(R_ENG, T_808, NDRUM, 1), NONE, NONE, NONE);
+        } else if (is_pad()) {
+            pg_grp = GR_SOUND;
+            add_page("TONE", PR(R_ENG, T_303, 1, PAD_CUTOFF), PR(R_ENG, T_303, 1, PAD_RESO),
+                     PR(R_ENG, T_303, 1, PAD_ENVMOD), PR(R_ENG, T_303, 1, PAD_CHORUS));
+            add_page("CHORD", PR(R_ENG, T_303, 1, PAD_CHORD), PR(R_ENG, T_303, 1, PAD_KEY),
+                     PR(R_ENG, T_303, 1, PAD_VOICING), PR(R_ENG, T_303, 1, PAD_WAVE));
+            add_page("ENV", PR(R_ENG, T_303, 1, PAD_ATTACK), PR(R_ENG, T_303, 1, PAD_DECAY),
+                     PR(R_ENG, T_303, 1, PAD_SUSTAIN), PR(R_ENG, T_303, 1, PAD_RELEASE));
+            more(PR(R_ENG, T_303, 1, PAD_PWM));
+            more(PR(R_ENG, T_303, 1, PAD_SUB));
+            more(PR(R_ENG, T_303, 1, PAD_HPF));
+            more(PR(R_ENG, T_303, 1, PAD_HOLD));
         } else if (is_303()) {
             pg_grp = GR_SOUND;
             add_page("TONE", PR(R_ENG, T_303, b, BASS303_CUTOFF), PR(R_ENG, T_303, b, BASS303_RESO),
@@ -895,8 +909,8 @@ static void build_pages(void)
     case V_SONG:
         add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_909, 0, 0), PR(R_SPAT, PART_808, 0, 0),
                  PR(R_SPAT, PART_303A, 0, 0));
-        add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_303B, 0, 0), PR(R_SPAT, PART_BRK, 0, 0),
-                 PR(R_SREP, 0, 0, 0));
+        add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_PAD, 0, 0),
+                 X0X_BREAK ? PR(R_SPAT, PART_BRK, 0, 0) : NONE, PR(R_SREP, 0, 0, 0));   /* (REPEAT: KNOB 4 either way) */
         break;
     default: break;
     }
@@ -1003,7 +1017,7 @@ static void open_global(void)
     list_rows[ui.list_n++] = PR(R_HDR, GR_MIDI, 0, 0);
     list_add(PR(R_CLKOUT, 0, 0, 0));
     list_add(PR(R_NOTEOUT, 0, 0, 0));
-    for (int p = 0; p < NPARTS; p++)
+    for (int p = 0; p < NPARTS; p++)               /* (BREAK MIDI CH stays: the list keeps its places) */
         list_add(PR(R_MIDICH, p, 0, 0));
     list_add(PR(R_CCOUT, 0, 0, 0));
     list_add(PR(R_MIXCH, 0, 0, 0));
@@ -1179,7 +1193,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         break;
     }
     case B_ARP:
-        L("TB-3PO: THE 303 LINE"); L("GENERATOR (303A, 303B)");
+        L("TB-3PO: THE 303 LINE"); L("GENERATOR (THE 303 ONLY)");
         if (gen) { L("OCT+: A NEW LINE"); L("OCT-: MUTATE IT"); }
         L("AGAIN: THE NEXT PAGE");
         break;
@@ -2174,12 +2188,12 @@ static void key_event(int k, int down)
         ui.btn_used |= 1u << B_HOME;                  /* MIX + HOME + black key: mute that channel */
         if (down && drum_mix_page() >= 0)
             mute_track(drum_mix_page(), bl);
-        else if (down && bl < NPARTS)
+        else if (down && bl < NPARTS_UI)
             mute_part(bl);
         return;
     }
     if (bl >= 0 && ui.view == V_MIX && cur_page() == 0) {   /* MIX's PARTS: black keys 1-5 pick the part */
-        if (down && bl < NPARTS) {
+        if (down && bl < NPARTS_UI) {
             ui.mixsel = (uint8_t)bl;
             build_pages();
         }
@@ -2370,8 +2384,8 @@ static void button_tap(int b)
             set_view(V_PART);
         break;
     case B_ARP:
-        if (!is_303()) {
-            warn("TB-3PO: PICK 303A OR 303B", 0);
+        if (!is_303() || is_pad()) {
+            warn("TB-3PO: PICK THE 303", 0);
             break;
         }
         if (ui.view == V_GEN && ui.overlay == O_NONE)  /* the generator; again: its next page */
@@ -2570,8 +2584,8 @@ static void input(void)
             turn_ref(list_rows[ui.list_sel], e, EN_ALGO);
         } else {
             int p = ui.part + (e > 0 ? 1 : -1);
-            ui.part = (uint8_t)(p < 0 ? 0 : p >= NPARTS ? NPARTS - 1 : p);
-            if (ui.view == V_GEN && !is_303())         /* TB-3PO is a 303's */
+            ui.part = (uint8_t)(p < 0 ? 0 : p >= NPARTS_UI ? NPARTS_UI - 1 : p);
+            if (ui.view == V_GEN && (!is_303() || is_pad()))   /* TB-3PO is the 303's */
                 set_view(V_PART);
             ui.outline_ok = 0;
             build_pages();
@@ -3196,6 +3210,12 @@ static void draw_303(int band, int gen)
         q = put_i(q, s + 1);
         q = put_s(q, "  ");
         q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
+        if (is_pad()) {                                /* the chord it plays: "STEP 9  E3 Em7" */
+            int nn = held_note_of(bp, s) + bp->transpose - 24;
+            q = put_s(q, " ");
+            q = put_s(q, NOTE_N[(nn % 12 + 12) % 12]);
+            q = put_s(q, PAD_Q_NAMES[pad_quality(proj.sound.v[T_303][1][PAD_CHORD], proj.sound.v[T_303][1][PAD_KEY], nn)]);
+        }
         if (bstep_gate(st) == G_TIE)
             q = put_s(q, " TIE");
         if (st->flags & BS_ACCENT)
@@ -3203,6 +3223,15 @@ static void draw_303(int band, int gen)
         if (st->flags & BS_SLIDE)
             put_s(q, " SLIDE");
         cv_text(4, vc(&FONT_B, 122, 16) - o, &FONT_B, t, C_WHITE);
+    } else if (is_pad()) {                             /* the PAD: its chords, its key */
+        static const char *const CN[3] = {"MIN7", "MAJ7", "AUTO IN "};
+        char t2[16];
+        int c = proj.sound.v[T_303][1][PAD_CHORD] % 3;
+        q = put_s(put_s(q, "CHORDS "), CN[c]);
+        if (c == PAD_AUTO)
+            put_s(q, NOTE_N[proj.sound.v[T_303][1][PAD_KEY] % 12]);
+        put_s(t2, proj.sound.v[T_303][1][PAD_HOLD] ? "HOLD" : "");
+        segs(4, vc(&FONT_S, 122, 16) - o, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
     } else {                                           /* else the line's scale and seed */
         char t2[16];
         q = put_s(q, ROOT_N[bp->gen.root % 12]);
@@ -3295,7 +3324,7 @@ static void draw_home(int band)
                            c >= (seq.chain_a < seq.chain_b ? seq.chain_a : seq.chain_b) &&
                            c <= (seq.chain_a < seq.chain_b ? seq.chain_b : seq.chain_a);
             box(x, 3, 12, 18, pattern_used(&proj.pat[c]) ? C_DIM : C_LINE);
-            for (p = 0; p < NPARTS; p++) {               /* a line per part with notes here: bright where it */
+            for (p = 0; p < NPARTS_UI; p++) {               /* a line per part with notes here: bright where it */
                 int used = part_used(&proj.pat[c], p);   /* plays now; a part playing it empty, a faint one */
                 if (used || seq.ppat[p] == c)
                     rbox(x + 2, 5 + p * 3, 8, 2, 1, seq.ppat[p] == c ? (used ? PART_COL[p] : dim(PART_COL[p], 4))
@@ -3347,7 +3376,7 @@ static void draw_song(int band)
         char t[8];
         if (row == 0) {                                /* the heading */
             cv_text(4, vc(&FONT_XS, y, 11), &FONT_XS, "BAR", C_GRAY);
-            for (p = 0; p < NPARTS; p++)
+            for (p = 0; p < NPARTS_UI; p++)
                 text_c(58 + p * 36, vc(&FONT_XS, y, 11), &FONT_XS, PART_S[p], PART_COL[p]);
             continue;
         }
@@ -3363,7 +3392,7 @@ static void draw_song(int band)
             cv_text(50, vc(&FONT_XS, y, 11), &FONT_XS, k ? "END" : "EMPTY: WHITE KEYS ADD BARS", C_DIM);
             continue;
         }
-        for (p = 0; p < NPARTS; p++) {
+        for (p = 0; p < NPARTS_UI; p++) {
             int muted = sg->bar[k].mute >> p & 1u;
             t[0] = 'P';
             put_i(t + 1, sg->bar[k].pat[p] + 1);
@@ -3383,7 +3412,7 @@ static void draw_fx(int band)
     if (band == 0) {                                   /* five parts x reverb / delay */
         cv_text(52, 0, &FONT_XS, "REVERB", C_GRAY);
         cv_text(148, 0, &FONT_XS, "DELAY", C_GRAY);
-        for (p = 0; p < NPARTS; p++) {
+        for (p = 0; p < NPARTS_UI; p++) {
             int y = 14 + p * 11, rv = proj.sound.v[T_MIX][p][1], dl = proj.sound.v[T_MIX][p][2];
             cv_text(3, y - 2, &FONT_XS, PART_S[p], PART_COL[p]);
             rbox(52, y + 2, 88, 6, 3, C_LINE);
@@ -3456,7 +3485,7 @@ static void draw_mix(int band)
         }
     }
     if (band == 0 && cur_page() != pg.n - 1) {         /* channel strips */
-        for (p = 0; p < NPARTS; p++) {
+        for (p = 0; p < NPARTS_UI; p++) {
             int x = 6 + p * 38, lvl = proj.sound.v[T_MIX][p][0], pk = eng_peak[p] * 64 / 32768;
             if (cur_page() == 0 && p == ui.mixsel)       /* PARTS: the part the knobs set */
                 box(x - 2, 0, 30, BAND_H, dim(PART_COL[p], 3));
@@ -3506,7 +3535,7 @@ static char *put_pct10(char *q, int v)                /* 123 -> "12.3%" */
 }
 static void draw_perf(int band)
 {
-    static const char *const SN[ENG_PROF_N] = {"909", "808", "303A", "303B", "BREAK", "FX", "MASTER", "SEQ"};
+    static const char *const SN[ENG_PROF_N] = {"909", "808", "303", "PAD", "BREAK", "FX", "MASTER", "SEQ"};
     char t[40], *q;
     int k;
     if (band == 0) {
@@ -4558,7 +4587,7 @@ static void speak_dump(void)
             ui.part = (uint8_t)p;
             ui.overlay = O_NONE;
             ui.help = 0;
-            if ((ui.view == V_GEN && !is_303()) || (!part_view() && p))
+            if ((ui.view == V_GEN && (!is_303() || is_pad())) || (!part_view() && p) || p >= NPARTS_UI)
                 continue;
             build_pages();
             for (q = 0; q < pg.n; q++) {

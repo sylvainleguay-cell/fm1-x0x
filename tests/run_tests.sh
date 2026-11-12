@@ -52,6 +52,7 @@ run dsp-hash sh -c "$CC $W -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT
 run drum808-bank sh -c "$CC $W -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/drum808_bank_test tests/host/drum808_bank_test.c && $OUT/drum808_bank_test"
 run stereo sh -c "$CC -O2 -ffp-contract=off -w -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/stereo_test tests/host/stereo_test.c firmware/src/dsp/master.c firmware/src/dsp/fxbus.c -lm && $OUT/stereo_test"
 run reverb sh -c "$CC $W -Wno-double-promotion -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/reverb_test tests/host/reverb_test.c -lm && $OUT/reverb_test"
+run pad sh -c "$CC $W -Ifirmware/src/dsp -Ifirmware/src -o $OUT/pad_test tests/host/pad_test.c firmware/src/dsp/pad.c -lm && $OUT/pad_test"
 run master sh -c "$CC $W -Wno-double-promotion -o $OUT/master_test tests/host/master_test.c firmware/src/dsp/master.c -lm && $OUT/master_test"
 for t in drum909 drum808 bass303 breaks; do
     [ -f "tests/host/run_$t.sh" ] && run "$t" sh "tests/host/run_$t.sh"
@@ -99,7 +100,7 @@ command -v node >/dev/null 2>&1 && run breaks-web node web/test_breaks.mjs   # t
 run host-build sh host/build_host.sh
 # the MIDI CC map (engine.c): the drum voices' pots by name, every CC its pot's own (or an alias), a value out and
 # back in unchanged (after the host build: the engine needs its generated tables)
-ENG_U="$(echo firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass303.c firmware/src/dsp/breaks.c \
+ENG_U="$(echo firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass303.c firmware/src/dsp/pad.c firmware/src/dsp/breaks.c \
     firmware/src/dsp/fxbus.c firmware/src/dsp/master.c firmware/src/seq/sequencer.c firmware/src/seq/tb3po.c \
     firmware/src/seq/pattern.c firmware/src/seq/motion.c firmware/src/app/engine.c)"
 run midicc sh -c "$CC -O2 -ffp-contract=off -std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -DX0X_HOST \
@@ -110,10 +111,15 @@ if command -v emcc >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then   # 
         node tests/host/emu_test.mjs build/emu/x0x.wasm build/host/emu_ref.wav"
     run emu-slots node tests/host/emu_slots_test.mjs build/emu/x0x.wasm build/test_loops/loop1.wav
 fi
+# the scenarios that play the break ("# needs: break" on their first line) run on a host built with it: this
+# build has the PAD in the break's and 303 B's place, and offers no break (X0X_BREAK=0)
+X0X_HOST_DEFS=-DX0X_BREAK=1 X0X_HOST_OUT=build/host/x0x_host_brk sh host/build_host.sh >/dev/null 2>&1 || FAIL=1
 for s in tests/scenarios/*.x0x; do
     n=$(basename "$s" .x0x)
+    h=build/host/x0x_host
+    head -n 1 "$s" | grep -q '^# needs: break' && h=build/host/x0x_host_brk
     mkdir -p "build/scenarios/$n"
-    run "scenario-$n" build/host/x0x_host "$s" "build/scenarios/$n"
+    run "scenario-$n" $h "$s" "build/scenarios/$n"
 done
 [ $FAIL -eq 0 ] && echo "all tests passed" || echo "TESTS FAILED"
 exit $FAIL

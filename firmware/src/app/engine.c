@@ -5,6 +5,7 @@
 #include "../dsp/drum909.h"
 #include "../dsp/drum808.h"
 #include "../dsp/bass303.h"
+#include "../dsp/pad.h"
 #include "../dsp/breaks.h"
 #include "../dsp/fxbus.h"
 #include "../dsp/master.h"
@@ -28,7 +29,23 @@ volatile uint32_t eng_scope_w;
 
 static drum909_t d909 POOL;
 static drum808_t d808 POOL;
-static bass303_t b303[NBASS] POOL;
+static bass303_t b303[1] POOL;          /* 303 A; the fourth part (303 B's place) is the PAD */
+static pad_t pad POOL;
+/* the two note parts: 0 the 303, 1 the PAD */
+static void bn_on(int p, int note, int acc, int sl)
+{
+    if (p)
+        pad_note_on(&pad, note, acc, sl);
+    else
+        bass303_note_on(&b303[0], note, acc, sl);
+}
+static void bn_off(int p)
+{
+    if (p)
+        pad_note_off(&pad);
+    else
+        bass303_note_off(&b303[0]);
+}
 static breaks_t brk POOL;
 static fxbus_t fx POOL;
 static master_t mst;
@@ -85,8 +102,8 @@ static void guard_apply(void)
     if (guard_on == guard_applied)
         return;
     guard_applied = guard_on;
-    for (k = 0; k < NBASS; k++)
-        bass303_set_lite(&b303[k], guard_on);
+    (void)k;
+    bass303_set_lite(&b303[0], guard_on);
     drum808_quiet = guard_on ? 3.2e-3f : 3.2e-5f;
 }
 
@@ -130,7 +147,7 @@ int engine_nvoices(int t)
     switch (t) {
     case T_909: return DR_NUM + 1;
     case T_808: return D8_NUM + 1;
-    case T_303: return NBASS;
+    case T_303: return NBASS;                            /* 0: the 303, 1: the PAD */
     case T_FX: return (fxbus_nparams() + NPARAMS_MAX - 1) / NPARAMS_MAX;
     case T_MIX: return NPARTS;
     default: return 1;
@@ -142,7 +159,7 @@ int engine_nparams(int t, int v)
     switch (t) {
     case T_909: return drum909_nparams(v);
     case T_808: return drum808_nparams(v);
-    case T_303: return bass303_nparams();
+    case T_303: return v == 1 ? pad_nparams() : bass303_nparams();
     case T_BRK: return 3;                                /* Level, Pitch, Filter (sends: the mixer's; the rest: the pattern's) */
     case T_FX: {
         const int n = fxbus_nparams() - v * NPARAMS_MAX;
@@ -159,7 +176,7 @@ const x0x_param_t *engine_param(int t, int v, int i)
     switch (t) {
     case T_909: return drum909_param(v, i);
     case T_808: return drum808_param(v, i);
-    case T_303: return bass303_param(i);
+    case T_303: return v == 1 ? pad_param(i) : bass303_param(i);
     case T_BRK: return breaks_param(BRK_NSET + i);
     case T_FX: return fxbus_param(fx_param_at(v, i));
     case T_MIX: return (i >= 0 && i < MX_NPARAMS) ? &MIX_P[i] : 0;
@@ -176,7 +193,7 @@ const char *engine_voice_name(int t, int v)
     switch (t) {
     case T_909: return (v >= 0 && v <= DR_NUM) ? N909[v] : "";
     case T_808: return (v >= 0 && v <= D8_NUM) ? N808[v] : "";
-    case T_303: return v ? "303 B" : "303 A";
+    case T_303: return v ? "PAD" : "303";
     case T_MIX: return (v >= 0 && v < NPARTS) ? PART_NAMES[v] : "";
     case T_BRK: return "BREAK";
     case T_FX: return "FX";
@@ -190,7 +207,14 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
     switch (t) {
     case T_909: drum909_set(&d909, v, i, val); break;
     case T_808: drum808_set(&d808, v, i, val); break;
-    case T_303: if (v >= 0 && v < NBASS) bass303_set(&b303[v], i, val); break;
+    case T_303:
+        if (v == 1) {
+            pad_set(&pad, i, val);
+            if (i == PAD_HOLD)
+                seq.hold_mask = (uint8_t)(val ? 2u : 0u);
+        } else if (v == 0)
+            bass303_set(&b303[0], i, val);
+        break;
     case T_BRK: breaks_set(&brk, BRK_NSET + i, val); break;
     case T_FX: fxbus_set(&fx, fx_param_at(v, i), val); break;
     case T_MIX:
@@ -274,7 +298,7 @@ void engine_sound_defaults(sound_t *s)
     s->v[T_BRK][0][0] = 127;                         /* the break: full level, part a little over unity */
     s->v[T_MIX][PART_BRK][MX_LEVEL] = 120;
     s->v[T_MIX][PART_BRK][MX_REV] = 25;
-    for (v = 0; v < NBASS; v++) {                    /* acid: low cutoff, high resonance, a long sweep, RAT */
+    for (v = 0; v < 1; v++) {                        /* acid: low cutoff, high resonance, a long sweep, RAT */
         s->v[T_303][v][BASS303_CUTOFF] = 48;
         s->v[T_303][v][BASS303_RESO] = 100;
         s->v[T_303][v][BASS303_ENVMOD] = 85;
@@ -286,6 +310,9 @@ void engine_sound_defaults(sound_t *s)
         s->v[T_MIX][PART_303A + v][MX_DLY] = v ? 60 : 80;
         s->v[T_MIX][PART_303A + v][MX_REV] = 12;
     }
+    s->v[T_MIX][PART_PAD][MX_LEVEL] = 80;            /* the PAD (its pots: pad.c's defaults): under the beat, */
+    s->v[T_MIX][PART_PAD][MX_REV] = 45;              /* in the room, and a little of the tape delay */
+    s->v[T_MIX][PART_PAD][MX_DLY] = 20;
     s->v[T_909][DR_CP][5] = 50;                      /* the clap in the room (90 drowned it) */
     s->v[T_909][DR_LT][1] = 92;                      /* the toms: shorter than 9W9's (its low tom rang */
     s->v[T_909][DR_MT][1] = 88;                      /* on for 1.7 s, which reads as reverb) */
@@ -380,11 +407,11 @@ static void s_bon(void *x, int p, int note, int acc, int sl)
 {
     (void)x;
     if (prob_skip(PART_303A + p, 0))                  /* skipped: a rest */
-        bass303_note_off(&b303[p]);
+        bn_off(p);
     else
-        bass303_note_on(&b303[p], note, acc, sl);
+        bn_on(p, note, acc, sl);
 }
-static void s_boff(void *x, int p) { (void)x; bass303_note_off(&b303[p]); }
+static void s_boff(void *x, int p) { (void)x; bn_off(p); }
 static uint8_t brk_applied[BRK_NSET];  /* the pattern settings the break was last given */
 static void s_brk(void *x, int s16, int bar, float spb, int en)
 {
@@ -393,7 +420,7 @@ static void s_brk(void *x, int s16, int bar, float spb, int en)
     if (en && prob_skip(PART_BRK, 0))
         en = 0;
     (void)x;
-    if (brk_hold)
+    if (brk_hold || !X0X_BREAK)                      /* (no break in this build: the PAD has its place) */
         return;
     breaks_set_quiet(&brk, bp->steps == 0 || (seq.mute & (1u << MUTE_BRK)));   /* unheard: stop decoding */
     for (i = 0; i < BRK_NSET; i++)       /* follow the playing pattern's settings (12 compares) */
@@ -462,6 +489,9 @@ static const seq_sink_t SINK = {s_drum_seq, s_bon, s_boff, s_brk, s_brkstop, s_m
  * MIX MIDI CH. In: the ISR passes each CC to the main loop through a ring (ui.c midicc.c sets it as its
  * knob). Out: the main loop sends what is changed by hand, the ISR what the lanes play (ALL), notes first. */
 static const uint8_t BASS_CC[BASS303_NPARAMS] = {16, 17, 18, 19, 20, 21, 24, 25, 22, 26, 23, 27};
+/* the PAD's (on its channel, 3): CC 16-31 in its pots' order; and the 303's aliases: 74 cutoff, 71 resonance,
+ * 75 decay */
+#define PAD_CC0 16
 /* each drum voice's Level, Tune and Decay pots (255: none); tests/host/midicc_test.c checks them by name */
 #define NO_POT 255u
 static const uint8_t DRUM_POT[NKIT][NDRUM][3] = {
@@ -517,8 +547,14 @@ int engine_cc_param(int role, int cc, int *t, int *v, int *i)
                 return 1;
             }
         return 0;
+    case PART_PAD:
+        *t = T_303;
+        *v = 1;
+        p = cc == 74 ? PAD_CUTOFF : cc == 71 ? PAD_RESO : cc == 75 ? PAD_DECAY   /* the aliases, as the 303's */
+          : cc >= PAD_CC0 && cc < PAD_CC0 + PAD_NPARAMS ? cc - PAD_CC0 : -1;
+        *i = p;
+        return p >= 0;
     case PART_303A:
-    case PART_303B:
         *t = T_303;
         *v = role - PART_303A;
         p = cc == 74 ? BASS303_CUTOFF : cc == 71 ? BASS303_RESO : cc == 75 ? BASS303_DECAY : -1;   /* the aliases */
@@ -558,6 +594,8 @@ int engine_cc_of(int t, int v, int i, int *role)
         return v >= 0 && v < NPARTS && i >= 0 && i < MX_NPARAMS ? MIX_CC[i] : -1;
     case T_303:
         *role = PART_303A + (v & 1);
+        if (v == 1)
+            return i >= 0 && i < PAD_NPARAMS ? PAD_CC0 + i : -1;
         return i >= 0 && i < BASS303_NPARAMS ? BASS_CC[i] : -1;
     case T_909:
     case T_808: {
@@ -704,8 +742,11 @@ static void midi_in(uint32_t pkt)
     if (ty == 0xB0) {
         if (d1 == 120 || d1 == 123) {                   /* all sound / notes off: the part's MIDI-held notes */
             for (k = 0; k < NBASS; k++)
-                if (seq.ch[TRK_BASS0 + k] == ch && bass_held[k]) {
-                    bass303_note_off(&b303[k]);
+                if (seq.ch[TRK_BASS0 + k] == ch && (bass_held[k] || (k && d1 == 120))) {
+                    if (k && d1 == 120)
+                        pad_all_off(&pad);              /* all sound off: the PAD's release too */
+                    else
+                        bn_off(k);
                     bass_held[k] = 0;
                 }
             if (seq.ch[TRK_BRK] == ch) {
@@ -731,14 +772,14 @@ static void midi_in(uint32_t pkt)
     for (k = 0; k < NBASS; k++)                         /* the 303s: overlapping notes slide */
         if (seq.ch[TRK_BASS0 + k] == ch) {
             if (ty == 0x90) {
-                bass303_note_on(&b303[k], d1, d2 >= 100, bass_held[k] != 0);
+                bn_on(k, d1, d2 >= 100, bass_held[k] != 0);
                 bass_held[k] = d1;
             } else if (ty == 0x80 && bass_held[k] == d1) {
-                bass303_note_off(&b303[k]);
+                bn_off(k);
                 bass_held[k] = 0;
             }
         }
-    if (seq.ch[TRK_BRK] == ch && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43) {   /* the break's slices */
+    if (X0X_BREAK && seq.ch[TRK_BRK] == ch && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43) {   /* the break's slices */
         breaks_live(&brk, d1 - 36, ty == 0x90);
         brk_held = (uint8_t)(ty == 0x90 ? brk_held | 1u << (d1 - 36) : brk_held & ~(1u << (d1 - 36)));
     }
@@ -757,10 +798,10 @@ static void drain(void)
         else if (type == C_DRUM)
             s_drum(0, (int)a, (int)b, (float)v / 4095.0f);
         else if (type == C_BON && a < NBASS)
-            bass303_note_on(&b303[a], (int)b, (int)(v & 1u), (int)((v >> 1) & 1u));
+            bn_on((int)a, (int)b, (int)(v & 1u), (int)((v >> 1) & 1u));
         else if (type == C_BOFF && a < NBASS)
-            bass303_note_off(&b303[a]);
-        else if (type == C_BRK && !brk_hold)
+            bn_off((int)a);
+        else if (type == C_BRK && !brk_hold && X0X_BREAK)
             breaks_live(&brk, (int)a, (int)b);
     }
     cq_r = r;
@@ -835,6 +876,11 @@ volatile uint32_t eng_dbg_wait, eng_dbg_nsub;  /* 24 MHz ticks waiting for core 
 /* the mix of one stretch between two events: dry left and right, the reverb and delay sends;
  * t0..tr the 808's scratch, kbuf the break's, mono the 909's kit send */
 static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256], tr[256], kbuf[256], mono[256];
+#if X0X_BREAK
+static float pad_r[256];               /* the PAD's right side (its left: out_r, as 303 B's was) */
+#else
+#define pad_r kbuf                     /* (no break: its buffer is free) */
+#endif
 
 /* a glide applied in place to a buffer that started at zero: buf * c is 0 + buf * c exactly, so this
  * is add_glide(zeros, buf) to the bit (the same steps of c) */
@@ -875,7 +921,7 @@ static void core2_job(uint32_t arg)
         PROF_ADD(PR_808, pt);
         pt = plat_cycles();
     }
-    if (!brk_hold) {
+    if (!brk_hold && X0X_BREAK) {
         brk_silent_now = breaks_silent(&brk);             /* the render writes zeros: nothing to mix */
         breaks_render(&brk, kbuf, (int)n);
     }
@@ -920,11 +966,15 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
         }
         PROF_ADD(PR_909, p9);
     }
-    for (b = 0; b < NBASS; b++) {
+    {
         PROF_T(pb);
-        idle[b] = b303[b].idle;                           /* idle: the render writes zeros */
-        bass303_render(&b303[b], bb[b], (int)n);
-        PROF_ADD(2 + b, pb);
+        idle[0] = b303[0].idle;                           /* idle: the render writes zeros */
+        bass303_render(&b303[0], bb[0], (int)n);
+        PROF_ADD(PR_303A, pb);
+        pb = plat_cycles();
+        idle[1] = pad.idle;                               /* the PAD: stereo, its left in bb[1], its right in pad_r */
+        pad_render(&pad, bb[1], pad_r, (int)n);
+        PROF_ADD(PR_303B, pb);
     }
     pt = plat_cycles();
 #if X0X_DEBUG
@@ -955,16 +1005,23 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
     }
     for (b = 0; b < NBASS; b++) {
         int p = PART_303A + b;
+        const float *l = bb[b], *r = bb[b], *m = bb[b];
         if (idle[b])
             continue;
+        if (b) {                                          /* the PAD: its two sides, the sends from their middle */
+            r = pad_r;
+            for (i = 0; i < n; i++)                       /* (t1: the 808's scratch, mixed in above) */
+                t1[i] = (bb[1][i] + pad_r[i]) * 0.5f;
+            m = t1;
+        }
         mix_targets(p, mix_level[p]);
-        add_glide(dry_l, bb[b], &mix_glide[p][GL_L], n);
-        add_glide(dry_r, bb[b], &mix_glide[p][GL_R], n);
-        add_glide(rev, bb[b], &mix_glide[p][GL_REV], n);
-        add_glide(dly, bb[b], &mix_glide[p][GL_DLY], n);
-        meter(p, bb[b], mix_level[p], n);
+        add_glide(dry_l, l, &mix_glide[p][GL_L], n);
+        add_glide(dry_r, r, &mix_glide[p][GL_R], n);
+        add_glide(rev, m, &mix_glide[p][GL_REV], n);
+        add_glide(dly, m, &mix_glide[p][GL_DLY], n);
+        meter(p, m, mix_level[p], n);
     }
-    if (!brk_hold && !brk_silent_now) {
+    if (X0X_BREAK && !brk_hold && !brk_silent_now) {
         float g = mix_level[PART_BRK];
         mix_targets(PART_BRK, g);
         add_glide(dry_l, kbuf, &mix_glide[PART_BRK][GL_L], n);
@@ -1208,7 +1265,7 @@ void engine_init(pattern_t *patterns, song_t *song, lane_t *lanes, const sound_t
     drum909_init(&d909);
     drum808_init(&d808);
     bass303_init(&b303[0]);
-    bass303_init(&b303[1]);
+    pad_init(&pad);
     breaks_init(&brk);
     fxbus_init(&fx, dly_buf, DLY_LEN);
     master_init(&mst);

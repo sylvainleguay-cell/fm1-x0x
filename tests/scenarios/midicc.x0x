@@ -1,13 +1,13 @@
-# MIDI CC in (fm1-x0x#15): a CC on a part's channel (909 10, 808 11, 303 A 2, 303 B 3, break 4) or on MIX
+# MIDI CC in (fm1-x0x#15): a CC on a part's channel (909 10, 808 11, 303 2, PAD 3) or on MIX
 # MIDI CH (1) sets its pot as the knob would. CC OUT starts OFF: nothing goes out.
 wait 300
 expect ccoutset 0
-# CC 123 (all notes off) on 303 A's channel ends the note MIDI holds there; CC 120 (all sound off) on the
-# break's lets go of its slices (their sends off, so no tail is left)
+# CC 123 (all notes off) on the 303's channel ends the note MIDI holds there; CC 120 (all sound off) on the
+# PAD's cuts its chord, its release too (their sends off, so no tail is left)
 param 5 2 1 0
 param 5 2 2 0
-param 5 4 1 0
-param 5 4 2 0
+param 5 3 1 0
+param 5 3 2 0
 midi 91 30 64
 wait 300
 peakreset
@@ -18,12 +18,12 @@ wait 1500
 peakreset
 wait 300
 expect peak_db_max -60
-midi 93 24 7F
+midi 92 39 7F
 wait 300
 peakreset
 wait 100
 expect peak_db_min -30
-midi B3 78 00
+midi B2 78 00
 wait 1500
 peakreset
 wait 300
@@ -35,18 +35,23 @@ expect sound2.0.0 64
 midi B1 4A 7F
 wait 30
 expect sound2.0.0 127
-midi B2 15 3F
+midi B1 15 3F
 wait 30
+expect sound2.0.5 0
+midi B1 15 40
+wait 30
+expect sound2.0.5 1
+# the PAD: CC 16 + its pot (CHORD CC 20, 0..2; KEY CC 21, 0..11; ATTACK CC 24), 74 its cutoff
+midi B2 14 7F
+midi B2 15 00
+wait 30
+expect sound2.1.4 2
 expect sound2.1.5 0
-midi B2 15 40
+midi B2 4A 10
+midi B2 18 7F
 wait 30
-expect sound2.1.5 1
-# 303 B: Tune is CC 24 (index 6), DrvType CC 26 (0..2)
-midi B2 18 00
-midi B2 1A 7F
-wait 30
-expect sound2.1.6 0
-expect sound2.1.9 2
+expect sound2.1.0 16
+expect sound2.1.8 127
 # the 909's voices by name: BD Level (CC 102), CH Decay (77: its Decay is pot 0), RS has no Decay (75)
 midi B9 66 20
 midi B9 4D 10

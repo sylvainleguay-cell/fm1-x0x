@@ -1,5 +1,20 @@
 # X0X for the M-VAVE FM-1
 
+> **This variant: 909, 808, one 303 and a PAD.** The second 303 and the breakbeat player are replaced by a
+> **PAD** part: a Juno-style four-voice polysynth (saw / pulse with PWM, sub, high-pass, 24 dB resonant filter,
+> ADSR, the Juno's chorus I / II / I+II in stereo) with a **chord generator**: each step's note plays a
+> four-note chord, **MIN7**, **MAJ7** or **AUTO** (the diatonic seventh chord of the note in the key you set:
+> Imaj7 ii7 iii7 IVmaj7 V7 vi7 viim7b5), voiced CLOSE, OPEN or WIDE. With HOLD on (the default) a chord rings
+> to the next note, so one note per bar writes a chord progression.
+>
+> On the FM-1: ALGORITHM to **PAD** (the fourth part), SEQ to write its steps (KNOB 1 a held step's note; the
+> screen names the chord), EDIT for its pages TONE (cutoff, resonance, env, chorus), CHORD (chord, key,
+> voicing, wave) and ENV (ADSR), and in MORE: PWM, SUB, HPF, HOLD. MIDI: notes on channel 3 play chords; its
+> pots are CC 16-31 in that order (74 cutoff, 71 resonance, 75 decay). Built with `X0X_BREAK=1`, the break
+> comes back (the PAD stays in 303 B's place). Projects keep the same format: patterns made with X0X load, their
+> 303 B lines then playing as chords. Code: `firmware/src/dsp/pad.c`; tests: `tests/host/pad_test.c`,
+> `tests/scenarios/pad.x0x`.
+
 X0X turns the M-VAVE FM-1 into a groovebox: a **909**, an **808**, two **303s** with an acid line
 generator, and a **breakbeat player**, all playing at once. Each part can play its own pattern,
 you can string patterns into a song, and you can record knob moves. Everything runs in stereo,

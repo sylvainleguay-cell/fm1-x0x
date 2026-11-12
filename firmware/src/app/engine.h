@@ -24,6 +24,11 @@ enum { T_909, T_808, T_303, T_BRK, T_FX, T_MIX, T_MST, NTARGETS };
 #define T_PROB NTARGETS                /* a lane's pseudo-target: a step's chance, 5..100 % (not in sound_t);
                                         * voice = part << 4 | drum track (0 on the 303s and the break) */
 enum { PART_909, PART_808, PART_303A, PART_303B, PART_BRK, NPARTS };
+#define PART_PAD PART_303B             /* this build: the fourth part is a Juno-style PAD with a chord generator */
+#ifndef X0X_BREAK
+#define X0X_BREAK 0                    /* 0: the break never plays and is not offered (its data stays in the project) */
+#endif
+#define NPARTS_UI (NPARTS - !X0X_BREAK)   /* the parts ALGORITHM, the song and the mixer offer */
 /* T_MIX, per part: level, reverb send, delay send, pan (64 = centre) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_PAN, MX_NPARAMS };
 #define NVOICES_MAX 12                 /* a drum machine: 11 tracks + the kit */

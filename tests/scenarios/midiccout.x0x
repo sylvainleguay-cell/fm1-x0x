@@ -31,7 +31,7 @@ wait 100
 expect sound0.0.0 80
 expect cc10.20 36
 expect ccouts 1
-# undo sends the snapshot: every mapped value once (130 CCs), the BD's TUNE as it is now (the turns and the CC
+# undo sends the snapshot: every mapped value once (134 CCs: the PAD has four pots more than 303 B had), the BD's TUNE as it is now (the turns and the CC
 # were one step: nothing rested 400 ms between them)
 midiclear
 wait 600
@@ -40,7 +40,7 @@ tap REC
 release HOME
 wait 600
 expect sound0.0.0 34
-expect ccouts 130
+expect ccouts 134
 expect cc10.20 34
 expect cc10.102 61
 expect cc2.16 48
@@ -53,7 +53,7 @@ tap PLAY
 release HOME
 wait 600
 expect sound0.0.0 80
-expect ccouts 130
+expect ccouts 134
 expect cc10.20 80
 # GLO > MIX MIDI CH (the ninth row): 16; the master's FILTER (19) then comes on 16, not 1
 tap GLO
@@ -76,7 +76,7 @@ reboot
 wait 600
 expect ccoutset 1
 expect mixchset 16
-expect ccouts 130
+expect ccouts 134
 expect cc16.19 127
 expect cc16.104 74
 expect cc1.104 -1

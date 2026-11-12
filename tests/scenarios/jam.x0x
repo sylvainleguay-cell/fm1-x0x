@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # Sends and the break bank: a breakbeat / acid jam built from the panel, 8 bars.
 wait 300
 # 909: kick on the quarters, closed hat on the off-beats, clap on 2 and 4

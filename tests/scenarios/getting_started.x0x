@@ -1,3 +1,4 @@
+# needs: break (run on a host built with X0X_BREAK=1; this build has the PAD in its place)
 # The manual's Getting started, step by step: each step as the manual words it, checked.
 wait 300
 # 1. X0X opens on the 909, every part empty. A kick: black key 1 (heard), white keys 1, 5, 9, 13

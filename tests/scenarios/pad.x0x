@@ -1,0 +1,37 @@
+# PAD (the fourth part, in the 303 B's place): its steps make chords; HOLD keeps a chord to the next note;
+# ALGORITHM stops at the PAD (no break in this build); TB-3PO is the 303's only.
+wait 300
+turn ALGO 3
+expect part 3
+turn ALGO 2
+expect part 3
+# its sound pages: TONE, CHORD, ENV
+tap EDIT
+shot pad_tone.png
+tap EDIT
+shot pad_chord.png
+tap EDIT
+shot pad_env.png
+# the steps: 1 and 9 on (the default note), step 9 a fifth up (K1 = note)
+tap SEQ
+tapkey w0
+key w8 down
+turn K1 7
+key w8 up
+expect gate1.0 1
+expect gate1.8 1
+expect gate1.4 0
+key w8 down
+shot pad_seq.png
+key w8 up
+# TB-3PO: refused on the PAD
+tap ARP
+expect view 8
+param 2 1 4 2
+wav pad_seq.wav
+tap PLAY
+wait 3900
+tap PLAY
+wait 1500
+wavstop
+expect peak_db_max >-40

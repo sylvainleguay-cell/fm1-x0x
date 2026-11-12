@@ -154,6 +154,8 @@ typedef struct {
     volatile uint8_t req_sync;        /* a tap: back to the quarter's start (seq_sync) */
     uint32_t mut_rng[NBASS];          /* auto-mutate random streams */
     uint8_t bass_notes_out[NBASS];    /* note echoed on MIDI, for the note off */
+    volatile uint8_t hold_mask;       /* bit b: note part b holds its note through rests, to the next note (the
+                                       * PAD's HOLD); its mute, a stop or a pattern change still release it */
 } seq_t;
 
 void seq_init(seq_t *s, pattern_t *patterns);
