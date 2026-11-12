@@ -5,13 +5,13 @@ turn ALGO 3
 expect part 3
 turn ALGO 2
 expect part 3
-# its sound pages: TONE, CHORD, ENV
+# its sound pages: TONE, CHORD, OSC (ENV the fourth)
 tap EDIT
 shot pad_tone.png
 tap EDIT
 shot pad_chord.png
 tap EDIT
-shot pad_env.png
+shot pad_osc.png
 # the steps: 1 and 9 on (the default note), step 9 a fifth up (K1 = note)
 tap SEQ
 tapkey w0

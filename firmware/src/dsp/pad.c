@@ -5,12 +5,10 @@
 
 #define CTL 32                                   /* samples between filter-coefficient updates */
 
-static const char *const N_CHORD[] = {"MIN7", "MAJ7", "AUTO"};
+static const char *const N_CHORD[] = {"MIN7", "MAJ7", "AUTO", "NOTE"};
 static const char *const N_KEY[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 static const char *const N_VOICING[] = {"CLOSE", "OPEN", "WIDE"};
-static const char *const N_WAVE[] = {"SAW", "PULSE", "BOTH"};
 static const char *const N_CHORUS[] = {"OFF", "I", "II", "I+II"};
-static const char *const N_HPF[] = {"0", "1", "2", "3"};
 static const char *const N_HOLD[] = {"OFF", "ON"};
 
 static const x0x_param_t PARAMS[PAD_NPARAMS] = {
@@ -18,18 +16,18 @@ static const x0x_param_t PARAMS[PAD_NPARAMS] = {
     {"Reso", 127, 25, 0},
     {"Env", 127, 30, 0},
     {"Chorus", 3, 1, N_CHORUS},
-    {"Chord", 2, PAD_MIN7, N_CHORD},
+    {"Chord", 3, PAD_MIN7, N_CHORD},
     {"Key", 11, 0, N_KEY},
     {"Voice", 2, PAD_OPEN, N_VOICING},
-    {"Wave", 2, 0, N_WAVE},
+    {"Hold", 1, 1, N_HOLD},
+    {"Saw", 127, 127, 0},
+    {"Pulse", 127, 0, 0},
+    {"PWM", 127, 40, 0},
+    {"Sub", 127, 35, 0},
     {"Attack", 127, 50, 0},
     {"Decay", 127, 80, 0},
     {"Sustain", 127, 100, 0},
     {"Releas", 127, 85, 0},
-    {"PWM", 127, 40, 0},
-    {"Sub", 127, 35, 0},
-    {"HPF", 3, 1, N_HPF},
-    {"Hold", 1, 1, N_HOLD},
 };
 
 int pad_nparams(void) { return PAD_NPARAMS; }
@@ -44,6 +42,8 @@ const char *const PAD_Q_NAMES[4] = {"m7", "maj7", "7", "m7b5"};
 int pad_quality(int chord, int key, int note)
 {
     int q;
+    if (chord == PAD_NOTE)
+        return -1;
     if (chord != PAD_AUTO)
         return chord == PAD_MAJ7 ? PAD_Q_MAJ7 : PAD_Q_M7;
     q = DEG[((note - key) % 12 + 12) % 12];
@@ -52,8 +52,13 @@ int pad_quality(int chord, int key, int note)
 
 int pad_chord(const pad_t *p, int note, int out[4])
 {
-    int k;
-    const int8_t *iv = IV[pad_quality(p->pot[PAD_CHORD], p->pot[PAD_KEY], note)];
+    int k, q = pad_quality(p->pot[PAD_CHORD], p->pot[PAD_KEY], note);
+    const int8_t *iv;
+    if (q < 0) {                                 /* NOTE: the note alone */
+        out[0] = note < 12 ? 12 : note > 115 ? 115 : note;
+        return 1;
+    }
+    iv = IV[q];
     switch (p->pot[PAD_VOICING]) {
     case PAD_OPEN: out[0] = note; out[1] = note + iv[2]; out[2] = note + iv[3]; out[3] = note + iv[1] + 12; break;
     case PAD_WIDE: out[0] = note - 12; out[1] = note + iv[2]; out[2] = note + iv[1] + 12; out[3] = note + iv[3] + 12; break;
@@ -95,11 +100,6 @@ void pad_set(pad_t *p, int i, int value)
     case PAD_RELEASE: p->rel = tcoef(value, 4.0f, 11.0f); break;
     case PAD_PWM: p->pwm = x * 0.45f; break;
     case PAD_SUB: p->sub = x * 0.8f; break;
-    case PAD_HPF: {
-        static const float HZ[4] = {0.0f, 90.0f, 240.0f, 560.0f};
-        p->hpk = value ? 1.0f - fm_expf(-6.2831853f * HZ[value] / PAD_SR) : 0.0f;
-        break;
-    }
     case PAD_CHORUS: {                                                       /* Juno-60: I 0.51 Hz, II 0.86 Hz, I+II 9.75 Hz */
         static const float RATE[4] = {0.0f, 0.513f, 0.863f, 9.75f}, LO[4] = {0, 1.66f, 1.66f, 3.25f},
                            HI[4] = {0, 5.35f, 5.35f, 3.85f};
@@ -121,19 +121,25 @@ void pad_init(pad_t *p)
     for (i = 0; i < PAD_NPARAMS; i++)
         pad_set(p, i, PARAMS[i].def);
     p->vol = 0.41f;                              /* (its level: the mixer's) */
+    p->hpk = 1.0f - fm_expf(-6.2831853f * 90.0f / PAD_SR);   /* the HPF: ~90 Hz, the Juno's first position */
     p->idle = 1;
 }
 
 void pad_note_on(pad_t *p, int note, int accent, int slide)
 {
-    int c[4], k, b;
+    int c[4], k, b, n;
     float vel = accent ? 1.0f : 0.72f;
-    pad_chord(p, note, c);
+    n = pad_chord(p, note, c);
+    if (n == 1)
+        vel *= 1.8f;                             /* one voice: as loud as a chord of four */
     if (slide && p->held) {                     /* legato: the same voices glide to the new chord */
         b = p->bank * 4;
         for (k = 0; k < 4; k++) {
-            p->v[b + k].inc_to = note_inc((float)c[k]);
-            p->v[b + k].key = (float)c[k];
+            if (k < n) {
+                p->v[b + k].inc_to = note_inc((float)c[k]);
+                p->v[b + k].key = (float)c[k];
+            } else if (p->v[b + k].stage && p->v[b + k].stage < 3)
+                p->v[b + k].stage = 3;           /* a chord sliding to a NOTE: the others let go */
         }
         return;
     }
@@ -142,7 +148,7 @@ void pad_note_on(pad_t *p, int note, int accent, int slide)
             p->v[p->bank * 4 + k].stage = 3;
     p->bank ^= 1;
     b = p->bank * 4;
-    for (k = 0; k < 4; k++) {
+    for (k = 0; k < n; k++) {
         pad_voice_t *v = &p->v[b + k];
         v->inc = v->inc_to = note_inc((float)c[k]);
         v->key = (float)c[k];
@@ -199,8 +205,7 @@ static inline float blep(float t, float dt)     /* polyBLEP residual */
 /* one voice, n samples, added into mono */
 static void voice_render(pad_t *p, pad_voice_t *v, float *mono, int n, float pw)
 {
-    const int wave = p->pot[PAD_WAVE];
-    const float gs = wave == 0 ? 0.5f : wave == 1 ? 0.0f : 0.35f, gp = wave == 1 ? 0.5f : wave == 0 ? 0.0f : 0.35f;
+    const float gs = (float)p->pot[PAD_SAW] * (0.5f / 127.0f), gp = (float)p->pot[PAD_PULSE] * (0.5f / 127.0f);
     const float sub = p->sub * 0.5f, hpk = p->hpk, att = p->att, dec = p->dec, sus = p->sus, rel = p->rel;
     const float k2 = p->reso_k, comp = 1.0f + (2.0f - k2) * 0.35f;
     float ph = v->ph, inc = v->inc, sb = v->sub, env = v->env, hp = v->hp;

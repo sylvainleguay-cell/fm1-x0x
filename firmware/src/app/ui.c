@@ -839,13 +839,11 @@ static void build_pages(void)
             add_page("TONE", PR(R_ENG, T_303, 1, PAD_CUTOFF), PR(R_ENG, T_303, 1, PAD_RESO),
                      PR(R_ENG, T_303, 1, PAD_ENVMOD), PR(R_ENG, T_303, 1, PAD_CHORUS));
             add_page("CHORD", PR(R_ENG, T_303, 1, PAD_CHORD), PR(R_ENG, T_303, 1, PAD_KEY),
-                     PR(R_ENG, T_303, 1, PAD_VOICING), PR(R_ENG, T_303, 1, PAD_WAVE));
+                     PR(R_ENG, T_303, 1, PAD_VOICING), PR(R_ENG, T_303, 1, PAD_HOLD));
+            add_page("OSC", PR(R_ENG, T_303, 1, PAD_SAW), PR(R_ENG, T_303, 1, PAD_PULSE),
+                     PR(R_ENG, T_303, 1, PAD_PWM), PR(R_ENG, T_303, 1, PAD_SUB));
             add_page("ENV", PR(R_ENG, T_303, 1, PAD_ATTACK), PR(R_ENG, T_303, 1, PAD_DECAY),
                      PR(R_ENG, T_303, 1, PAD_SUSTAIN), PR(R_ENG, T_303, 1, PAD_RELEASE));
-            more(PR(R_ENG, T_303, 1, PAD_PWM));
-            more(PR(R_ENG, T_303, 1, PAD_SUB));
-            more(PR(R_ENG, T_303, 1, PAD_HPF));
-            more(PR(R_ENG, T_303, 1, PAD_HOLD));
         } else if (is_303()) {
             pg_grp = GR_SOUND;
             add_page("TONE", PR(R_ENG, T_303, b, BASS303_CUTOFF), PR(R_ENG, T_303, b, BASS303_RESO),
@@ -3210,11 +3208,14 @@ static void draw_303(int band, int gen)
         q = put_i(q, s + 1);
         q = put_s(q, "  ");
         q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
-        if (is_pad()) {                                /* the chord it plays: "STEP 9  E3 Em7" */
+        if (is_pad()) {                                /* the chord it plays: "STEP 9  E3 Em7" (NOTE: none) */
             int nn = held_note_of(bp, s) + bp->transpose - 24;
-            q = put_s(q, " ");
-            q = put_s(q, NOTE_N[(nn % 12 + 12) % 12]);
-            q = put_s(q, PAD_Q_NAMES[pad_quality(proj.sound.v[T_303][1][PAD_CHORD], proj.sound.v[T_303][1][PAD_KEY], nn)]);
+            int pq = pad_quality(proj.sound.v[T_303][1][PAD_CHORD], proj.sound.v[T_303][1][PAD_KEY], nn);
+            if (pq >= 0) {
+                q = put_s(q, " ");
+                q = put_s(q, NOTE_N[(nn % 12 + 12) % 12]);
+                q = put_s(q, PAD_Q_NAMES[pq]);
+            }
         }
         if (bstep_gate(st) == G_TIE)
             q = put_s(q, " TIE");
@@ -3224,9 +3225,9 @@ static void draw_303(int band, int gen)
             put_s(q, " SLIDE");
         cv_text(4, vc(&FONT_B, 122, 16) - o, &FONT_B, t, C_WHITE);
     } else if (is_pad()) {                             /* the PAD: its chords, its key */
-        static const char *const CN[3] = {"MIN7", "MAJ7", "AUTO IN "};
+        static const char *const CN[4] = {"MIN7", "MAJ7", "AUTO IN ", "OFF: NOTES"};
         char t2[16];
-        int c = proj.sound.v[T_303][1][PAD_CHORD] % 3;
+        int c = proj.sound.v[T_303][1][PAD_CHORD] & 3;
         q = put_s(put_s(q, "CHORDS "), CN[c]);
         if (c == PAD_AUTO)
             put_s(q, NOTE_N[proj.sound.v[T_303][1][PAD_KEY] % 12]);

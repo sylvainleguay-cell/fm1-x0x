@@ -4,6 +4,7 @@
  * The part's step lane plays one note a step, as the 303's; PAD turns it into a four-note chord:
  *   CHORD  MIN7 (root, b3, 5, b7), MAJ7 (root, 3, 5, 7) or AUTO: the diatonic seventh chord of the note in
  *          the major key KEY (I maj7, ii m7, iii m7, IV maj7, V 7, vi m7, vii m7b5; a note outside the key: maj7)
+ *          or NOTE: no chord, the note alone (a lead or a bass line on the PAD's sound)
  *   VOICE  CLOSE (the four inside an octave), OPEN (root, 5, 7, the 3rd an octave up), WIDE (the root an octave
  *          down, then 5, 3 + 12, 7 + 12)
  * HOLD (ON, the default): a chord rings on through the empty steps to the next note (the sequencer's: seq_t
@@ -11,9 +12,9 @@
  * A step's ACCENT plays it louder; a SLIDE into the next step changes the chord without restarting the envelopes
  * (and glides). Chords alternate between two banks of four voices, so the last one releases under the next.
  *
- * The voice: one DCO a voice, its saw and its pulse from the same ramp (WAVE: SAW, PULSE, BOTH), the pulse's width
- * swept by a slow LFO (PWM), a square sub-oscillator an octave down (SUB); a one-pole high-pass (HPF 0..3, the
- * Juno's switch); a 24 dB/oct resonant low-pass (two state-variable filters, the second resonant) with half
+ * The voice: one DCO a voice, its saw and its pulse from the same ramp, each with its own level in the OSC page's
+ * mixer (SAW, PULSE: 0 off), the pulse's width swept by a slow LFO (PWM), a square sub-oscillator an octave down
+ * (SUB); a one-pole high-pass at ~90 Hz (the Juno's HPF in its first position); a 24 dB/oct resonant low-pass (two state-variable filters, the second resonant) with half
  * keyboard tracking and its envelope's sweep (ENV); one ADSR for the amplitude and the filter, as on the 106.
  * After the voices, the Juno's chorus (OFF, I, II, I+II): a short delay swept by a triangle, its two taps in
  * opposite phase to the left and the right: the part comes out in stereo. */
@@ -27,12 +28,12 @@
 
 enum {
     PAD_CUTOFF, PAD_RESO, PAD_ENVMOD, PAD_CHORUS,      /* page 1: TONE */
-    PAD_CHORD, PAD_KEY, PAD_VOICING, PAD_WAVE,         /* page 2: CHORD */
-    PAD_ATTACK, PAD_DECAY, PAD_SUSTAIN, PAD_RELEASE,   /* page 3: ENV */
-    PAD_PWM, PAD_SUB, PAD_HPF, PAD_HOLD,               /* more (HOLD: the sequencer's, engine.c) */
+    PAD_CHORD, PAD_KEY, PAD_VOICING, PAD_HOLD,         /* page 2: CHORD (HOLD: the sequencer's, engine.c) */
+    PAD_SAW, PAD_PULSE, PAD_PWM, PAD_SUB,              /* page 3: OSC, the DCO's mixer */
+    PAD_ATTACK, PAD_DECAY, PAD_SUSTAIN, PAD_RELEASE,   /* page 4: ENV */
     PAD_NPARAMS
 };
-enum { PAD_MIN7, PAD_MAJ7, PAD_AUTO };
+enum { PAD_MIN7, PAD_MAJ7, PAD_AUTO, PAD_NOTE };   /* NOTE: no chord, the step's note alone */
 enum { PAD_CLOSE, PAD_OPEN, PAD_WIDE };
 
 typedef struct {
@@ -63,9 +64,9 @@ void pad_note_on(pad_t *p, int note, int accent, int slide);
 void pad_note_off(pad_t *p);
 void pad_all_off(pad_t *p);
 void pad_render(pad_t *p, float *out_l, float *out_r, int n);   /* writes (not adds) n samples a side */
-int pad_chord(const pad_t *p, int note, int out[4]);             /* the notes of the chord on note (tests, UI) */
+int pad_chord(const pad_t *p, int note, int out[4]);             /* the notes it plays on note (4, or 1: NOTE) */
 enum { PAD_Q_M7, PAD_Q_MAJ7, PAD_Q_7, PAD_Q_M7B5 };
-int pad_quality(int chord, int key, int note);                   /* the chord's kind (PAD_Q_*) for CHORD, KEY pots */
+int pad_quality(int chord, int key, int note);                   /* the chord's kind (PAD_Q_*), -1: NOTE (no chord) */
 extern const char *const PAD_Q_NAMES[4];                         /* "m7", "maj7", "7", "m7b5" */
 int pad_nparams(void);
 const x0x_param_t *pad_param(int i);

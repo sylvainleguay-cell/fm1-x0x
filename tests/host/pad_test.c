@@ -58,6 +58,9 @@ int main(void)
     pad_set(&p, PAD_KEY, 0);
     pad_chord(&p, 55, c);                         /* G7 in C */
     CHECK(c[0] == 55 && c[1] == 59 && c[2] == 62 && c[3] == 65, "AUTO G in C: %d %d %d %d", c[0], c[1], c[2], c[3]);
+    pad_set(&p, PAD_CHORD, PAD_NOTE);            /* NOTE: no chord */
+    CHECK(pad_chord(&p, 57, c) == 1 && c[0] == 57 && pad_quality(PAD_NOTE, 0, 57) < 0, "NOTE: the note alone");
+    pad_set(&p, PAD_CHORD, PAD_AUTO);
     pad_set(&p, PAD_VOICING, PAD_OPEN);
     pad_chord(&p, 57, c);                         /* Am7 open: A E G C+12 */
     CHECK(c[0] == 57 && c[1] == 64 && c[2] == 67 && c[3] == 72, "OPEN Am7: %d %d %d %d", c[0], c[1], c[2], c[3]);
@@ -75,6 +78,33 @@ int main(void)
     run(4, 0);
     pk = run(20, &corr);
     CHECK(corr > 0.999f, "chorus off: mono (correlation %f)", (double)corr);
+    /* NOTE: one voice sounds; a chord sliding to a NOTE keeps one */
+    pad_init(&p);
+    pad_set(&p, PAD_CHORD, PAD_NOTE);
+    pad_note_on(&p, 57, 0, 0);
+    run(10, 0);
+    for (n = 0, k = 0; k < PAD_NV; k++)
+        n += p.v[k].stage != 0;
+    CHECK(n == 1, "NOTE: %d voices sound", n);
+    pad_set(&p, PAD_CHORD, PAD_MIN7);
+    pad_note_on(&p, 57, 0, 0);
+    pad_set(&p, PAD_CHORD, PAD_NOTE);
+    pad_note_on(&p, 60, 0, 1);
+    run(1, 0);
+    for (n = 0, k = 0; k < 4; k++)
+        n += p.v[p.bank * 4 + k].stage == 1 || p.v[p.bank * 4 + k].stage == 2;
+    CHECK(n == 1, "a chord sliding to a NOTE: %d voices held", n);
+    /* the OSC mixer: saw off and pulse off, sub off: silence; the pulse alone sounds */
+    pad_init(&p);
+    pad_set(&p, PAD_SAW, 0);
+    pad_set(&p, PAD_SUB, 0);
+    pad_note_on(&p, 57, 0, 0);
+    pk = run(40, 0);
+    CHECK(pk < 1e-3f, "SAW 0 PULSE 0 SUB 0: silent (%f)", (double)pk);
+    pad_set(&p, PAD_PULSE, 127);
+    pk = run(40, 0);
+    CHECK(pk > 0.05f, "PULSE alone: %f", (double)pk);
+    pad_note_off(&p);
     /* release: it goes idle */
     pad_note_off(&p);
     for (i = 0; i < 2000 && !p.idle; i++)

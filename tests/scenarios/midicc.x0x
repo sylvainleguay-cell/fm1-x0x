@@ -41,11 +41,11 @@ expect sound2.0.5 0
 midi B1 15 40
 wait 30
 expect sound2.0.5 1
-# the PAD: CC 16 + its pot (CHORD CC 20, 0..2; KEY CC 21, 0..11; ATTACK CC 24), 74 its cutoff
+# the PAD: CC 16 + its pot (CHORD CC 20, 0..3; KEY CC 21, 0..11; SAW CC 24), 74 its cutoff
 midi B2 14 7F
 midi B2 15 00
 wait 30
-expect sound2.1.4 2
+expect sound2.1.4 3
 expect sound2.1.5 0
 midi B2 4A 10
 midi B2 18 7F
